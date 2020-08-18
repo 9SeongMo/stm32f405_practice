@@ -12,6 +12,18 @@ extern UART_HandleTypeDef UartHandle;
 //	HAL_TIM_IRQHandler(&TimHandle3);
 //}
 
+void EXTI0_IRQHandler(){
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+}
+
+void EXTI1_IRQHandler(){
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_1);
+}
+
+void EXTI2_IRQHandler(){
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_2);
+}
+
 void USART1_IRQHandler(void){
 	HAL_UART_IRQHandler(&UartHandle);
 }

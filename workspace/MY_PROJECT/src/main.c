@@ -34,6 +34,10 @@
 #include "Timer.h"
 #include "BlinkLed.h"
 
+#include "stm32f4xx_hal.h"
+#include "stm32f4xx_it.h"
+#include "stm32F4xx.h"
+
 // ----------------------------------------------------------------------------
 //
 // Standalone STM32F4 led blink sample (trace via ITM).
@@ -58,6 +62,12 @@
 #define BLINK_ON_TICKS  (TIMER_FREQUENCY_HZ * 3 / 4)
 #define BLINK_OFF_TICKS (TIMER_FREQUENCY_HZ - BLINK_ON_TICKS)
 
+
+#define countof(a)      (sizeof(a) / sizeof(*(a))) //데이터사이즈
+#define TxBufferSize   (countof(TxBuffer) - 1)
+#define RxBufferSize   0xFF
+#define arrSize (countof(arr) - 1)
+
 // ----- main() ---------------------------------------------------------------
 
 // Sample pragmas to cope with warnings. Please note the related line at
@@ -67,23 +77,77 @@
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
-#include "stm32f4xx_hal.h"
-#include "stm32f4xx_it.h"
-#include "stm32F4xx.h"
 
-
-GPIO_InitTypeDef GP;
+//--------------------------------------------------------------------------------
+GPIO_InitTypeDef GP;   // uart용 gpio
 UART_HandleTypeDef UartHandle;
-
-
-#define countof(a)      (sizeof(a) / sizeof(*(a))) //데이터사이즈
-#define TxBufferSize   (countof(TxBuffer) - 1)
-#define RxBufferSize   0xFF
-
+GPIO_InitTypeDef LED;
+GPIO_InitTypeDef JOG;
+GPIO_InitTypeDef PIEZO;
 
 uint8_t TxBuffer[] = "Hello World! \n\r" ;
 uint8_t RxBuffer[RxBufferSize];
 
+void ms_delay_int_count(volatile unsigned int nTime);
+void us_delay_int_count(volatile unsigned int n);
+void EXTILine_JOG_Config(void);
+void UART_Config(void);
+void LED_Config(void);
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+void PIEZO_Config(void);
+
+
+void ms_delay_int_count(volatile unsigned int nTime){
+	nTime = nTime*14000;
+	for(;nTime>0; nTime--);
+}
+
+ void us_delay_int_count(volatile unsigned int n){
+	 for(n *=12; n>0; n--);
+ }
+
+ // --------------------------- Config----------------------------
+
+ void PIEZO_Config(void){
+	 __HAL_RCC_GPIOB_CLK_ENABLE();
+
+	 PIEZO.Pin = GPIO_PIN_15;
+	 PIEZO.Mode = GPIO_MODE_OUTPUT_PP;
+	 PIEZO.Pull = GPIO_NOPULL;
+	 PIEZO.Speed = GPIO_SPEED_LOW;
+	 HAL_GPIO_Init(GPIOB, &PIEZO);
+
+ }
+
+ void LED_Config(void){
+		__HAL_RCC_GPIOC_CLK_ENABLE();
+
+		LED.Pin = GPIO_PIN_2 | GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5  ;
+		LED.Mode = GPIO_MODE_OUTPUT_PP;
+		LED.Pull = GPIO_NOPULL;
+		LED.Speed = GPIO_SPEED_LOW;
+		HAL_GPIO_Init(GPIOC, &LED);
+ }
+
+ void EXTILine_JOG_Config(void){
+ 		__HAL_RCC_GPIOB_CLK_ENABLE();
+
+ 		JOG.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2;
+ 		JOG.Mode = GPIO_MODE_IT_RISING;
+ 		JOG.Pull = GPIO_NOPULL;
+ 		JOG.Speed = GPIO_SPEED_HIGH;
+ 		HAL_GPIO_Init(GPIOB, &JOG);
+
+ 		HAL_NVIC_SetPriority(EXTI0_IRQn,2,0);
+ 		HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+ 		HAL_NVIC_SetPriority(EXTI1_IRQn,2,0);
+ 		HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+ 		HAL_NVIC_SetPriority(EXTI2_IRQn,2,0);
+ 		HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+
+  }
 
 void UART_Config(void){
    //UART CLOCK 활성화
@@ -113,15 +177,64 @@ void UART_Config(void){
    HAL_NVIC_EnableIRQ(USART1_IRQn);
 }
 
+//-----------------Callback---------------------------
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+
+	 if(GPIO_Pin == GPIO_PIN_0){ // key up
+		 uint8_t arr[] = "camera on\n\r";
+		 HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+
+		 for(int i=0; i<6; i++){
+			 HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2 |GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 );
+			 ms_delay_int_count(100);
+		 }
+	 }
+	 else if(GPIO_Pin == GPIO_PIN_1){  // key down
+		 uint8_t arr[] = "camera off\n\r";
+		 HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+
+		 for(int i=0; i<6; i++){
+			 HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2 |GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 );
+			 ms_delay_int_count(100);
+		 }
+	 }
+
+	 else if(GPIO_Pin == GPIO_PIN_2){  // key center
+		 //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2 |GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 );
+	 	 }
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
      //RxBuffer[0] += 1;
      HAL_UART_Transmit(huart, (uint8_t*)RxBuffer, 1, 0xFFFF);
+
+     unsigned int period,buf;
+
+     for(int i=0; i<10; i++){
+         for(period = 0x1000; period >=1; period--){
+        	 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 1);
+        	 buf = period;
+        	 while(buf--);
+
+        	 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 0);
+        	 buf = period;
+        	 while(buf--);
+         }
+     }
+
 }
+
 
 int main(int argc, char* argv[])
 {
    UART_Config();
+   LED_Config();
+   EXTILine_JOG_Config();
+   PIEZO_Config();
+
    HAL_UART_Transmit(&UartHandle, (uint8_t*)TxBuffer, TxBufferSize, 0xFFFF);
+
    while (1)
     {
      HAL_UART_Receive_IT(&UartHandle, (uint8_t*)RxBuffer, 1); //타임아웃이없기때문에 밑에 할일이있으면 한다
