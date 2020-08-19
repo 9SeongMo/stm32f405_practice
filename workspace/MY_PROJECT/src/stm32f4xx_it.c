@@ -5,9 +5,10 @@ extern TIM_HandleTypeDef TimHandle2,TimHandle3;
 extern TIM_OC_InitTypeDef TIM_OCInit;
 extern UART_HandleTypeDef UartHandle;
 
-//void TIM2_IRQHandler(){
-//	HAL_TIM_IRQHandler(&TimHandle2);
-//}
+void TIM2_IRQHandler(){
+	HAL_TIM_IRQHandler(&TimHandle2);
+}
+
 //void TIM3_IRQHandler(){
 //	HAL_TIM_IRQHandler(&TimHandle3);
 //}

@@ -78,35 +78,62 @@
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
 
-//--------------------------------------------------------------------------------
+//-------------------------------전역변수-----------------------------------------------------------
 GPIO_InitTypeDef GP;   // uart용 gpio
 UART_HandleTypeDef UartHandle;
 GPIO_InitTypeDef LED;
 GPIO_InitTypeDef JOG;
 GPIO_InitTypeDef PIEZO;
+GPIO_InitTypeDef LCD;
+TIM_HandleTypeDef TimHandle2;
+TIM_OC_InitTypeDef TIM_OCInit;
 
 uint8_t TxBuffer[] = "Hello World! \n\r" ;
 uint8_t RxBuffer[RxBufferSize];
+
+int star[]= {0,0,4,4,5,5,4,3,3,2,2,1,1,0};
+int test[] ={0};
+int timer_cnt,click;
 
 void ms_delay_int_count(volatile unsigned int nTime);
 void us_delay_int_count(volatile unsigned int n);
 void EXTILine_JOG_Config(void);
 void UART_Config(void);
 void LED_Config(void);
+void LCD_Config(void);
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 void PIEZO_Config(void);
+void play_note(int note);
+void LCD_write(unsigned char rs, char data);
+void lcd_put_string(char* str );
 
 
-void ms_delay_int_count(volatile unsigned int nTime){
-	nTime = nTime*14000;
-	for(;nTime>0; nTime--);
+ // ----------------------------------------------- Config---------------------------------------------------
+
+void LCD_Config(void){
+
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+
+	LCD.Pin = GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_14 | GPIO_PIN_15 ;
+	LCD.Mode = GPIO_MODE_OUTPUT_PP;
+	LCD.Pull = GPIO_NOPULL;
+	LCD.Speed = GPIO_SPEED_FAST;
+	HAL_GPIO_Init(GPIOC, &LCD);
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+	LCD_write(0,0x33);
+	LCD_write(0,0x32);
+	LCD_write(0,0x28);
+	LCD_write(0,0x0F);
+	LCD_write(0,0x01);
+	LCD_write(0,0x06);
+	LCD_write(0,0x02);
 }
 
- void us_delay_int_count(volatile unsigned int n){
-	 for(n *=12; n>0; n--);
- }
 
- // --------------------------- Config----------------------------
 
  void PIEZO_Config(void){
 	 __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -116,7 +143,6 @@ void ms_delay_int_count(volatile unsigned int nTime){
 	 PIEZO.Pull = GPIO_NOPULL;
 	 PIEZO.Speed = GPIO_SPEED_LOW;
 	 HAL_GPIO_Init(GPIOB, &PIEZO);
-
  }
 
  void LED_Config(void){
@@ -177,7 +203,33 @@ void UART_Config(void){
    HAL_NVIC_EnableIRQ(USART1_IRQn);
 }
 
-//-----------------Callback---------------------------
+
+void TIMER2_Config(int period){
+	__HAL_RCC_TIM2_CLK_ENABLE();
+
+	TimHandle2.Instance = TIM2;  // timer2 는 APB1 42MHz 에 연결되어있다 42000000Hz
+	TimHandle2.Init.Period = period -1;  // 0~9999(ARR) -> 1만번 떨굼 ->  4200Hz  ///  100000-1  -> 10초
+	//TimHandle2.Init.Period = 100000 -1;  // 0~9999(ARR) -> 1만번 떨굼 ->  4200Hz  ///  100000-1  -> 10초
+	TimHandle2.Init.Prescaler = 8400 -1; // 8400-1  = 1초
+	TimHandle2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;  // 디비전 설정 x
+	TimHandle2.Init.CounterMode = TIM_COUNTERMODE_UP;   // 0부터 ARR 설정값 까지 올라가면서 카운트
+	HAL_TIM_Base_Init(&TimHandle2);
+	HAL_TIM_Base_Start_IT(&TimHandle2);
+//	 TIM_OCInit.OCMode = TIM_OCMODE_TIMING;
+//	 TIM_OCInit.Pulse = 8400 -1;
+//	 TIM_OCInit.OCPolarity =TIM_OCPOLARITY_LOW;
+//	 TIM_OCInit.OCFastMode = TIM_OCFAST_DISABLE;
+//	 HAL_TIM_OC_Init(&TimHandle2);
+//
+//	 HAL_TIM_OC_ConfigChannel(&TimHandle2, &TIM_OCInit, TIM_CHANNEL_1);
+//	 HAL_TIM_OC_Start_IT(&TimHandle2, TIM_CHANNEL_1);
+
+	HAL_NVIC_SetPriority(TIM2_IRQn,0,0);
+	HAL_NVIC_EnableIRQ(TIM2_IRQn);
+
+}
+
+//------------------------------------Callback-------------------------------------------------------------------------
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
@@ -201,7 +253,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	 }
 
 	 else if(GPIO_Pin == GPIO_PIN_2){  // key center
-		 //HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2 |GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 );
+		   timer_cnt = 10000*click;
+		   TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
+		   click +=1;
 	 	 }
 }
 
@@ -225,6 +279,101 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
 }
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
+
+//	 for(int i=0; i<sizeof(star)/sizeof(int); i++){
+//		 play_note(star[i]);
+//	 }
+
+	 for(int i=0; i<sizeof(test)/sizeof(int); i++){
+		 play_note(test[i]);
+	 }
+}
+
+//void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim){
+//		 for(int i=0; i<sizeof(star)/sizeof(int); i++){
+//			 play_note(star[i]);
+//		 }
+//}
+
+//--------------------------------------Function----------------------------------------------------
+
+void lcd_put_string(char* str ){
+	char* s = str;
+	int len = strlen(str);
+
+	for (int i =0; i<len; i++){
+		LCD_write(1,s[i]);
+		if(i >2 && i%16 ==0){
+			ms_delay_int_count(2000);
+			LCD_init();
+		}
+	}
+}
+
+void LCD_write(unsigned char rs, char data){  //rs는 0과 1을 가지는 옵션플래그
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, rs);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+	us_delay_int_count(2);
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, (data >> 4) & 0x1);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, (data >> 5) & 0x1);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14, (data >> 6) & 0x1);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, (data >> 7) & 0x1);
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+	us_delay_int_count(2);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+	us_delay_int_count(2);
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, (data >> 0) & 0x1);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, (data >> 1) & 0x1);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_14, (data >> 2) & 0x1);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_15, (data >> 3) & 0x1);
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+	us_delay_int_count(2);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+	ms_delay_int_count(2);
+}
+
+void play_note(int note){
+
+	int T;
+
+	if(note == 0) T = 950;  // 도
+	else if(note == 1) T = 850; // 레
+	else if(note == 2) T = 750; // 미
+	else if(note == 3) T = 715; // 파
+	else if(note == 4) T =  630; // 솔
+	else if(note == 5) T =  550; // 라
+	else if (note == -1) T = 1010; // 낮은 시
+	else if(note == -2) T = 1100; // 낮은 라
+	else if(note == -3) T = 1250;//낮은 솔
+
+
+	for(int i=0; i<200; i++){
+		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 1);
+		us_delay_int_count(T);
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 0);
+		us_delay_int_count(T);
+	}
+
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 0);
+	ms_delay_int_count(100);
+
+}
+
+void ms_delay_int_count(volatile unsigned int nTime){
+	nTime = nTime*14000;
+	for(;nTime>0; nTime--);
+}
+
+ void us_delay_int_count(volatile unsigned int n){
+	 for(n *=12; n>0; n--);
+ }
+
+//---------------------------------------------MAIN-----------------------------------------------
 
 int main(int argc, char* argv[])
 {
@@ -232,6 +381,7 @@ int main(int argc, char* argv[])
    LED_Config();
    EXTILine_JOG_Config();
    PIEZO_Config();
+   click = 1;
 
    HAL_UART_Transmit(&UartHandle, (uint8_t*)TxBuffer, TxBufferSize, 0xFFFF);
 
