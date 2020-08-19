@@ -37,6 +37,7 @@
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_it.h"
 #include "stm32F4xx.h"
+#include <string.h>
 
 // ----------------------------------------------------------------------------
 //
@@ -92,8 +93,7 @@ uint8_t TxBuffer[] = "Hello World! \n\r" ;
 uint8_t RxBuffer[RxBufferSize];
 
 int star[]= {0,0,4,4,5,5,4,3,3,2,2,1,1,0};
-int test[] ={0};
-int timer_cnt,click;
+int timer_cnt=10000,click=1;
 
 void ms_delay_int_count(volatile unsigned int nTime);
 void us_delay_int_count(volatile unsigned int n);
@@ -106,6 +106,7 @@ void PIEZO_Config(void);
 void play_note(int note);
 void LCD_write(unsigned char rs, char data);
 void lcd_put_string(char* str );
+void LCD_init();
 
 
  // ----------------------------------------------- Config---------------------------------------------------
@@ -123,17 +124,8 @@ void LCD_Config(void){
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
 
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
-	LCD_write(0,0x33);
-	LCD_write(0,0x32);
-	LCD_write(0,0x28);
-	LCD_write(0,0x0F);
-	LCD_write(0,0x01);
-	LCD_write(0,0x06);
-	LCD_write(0,0x02);
+	LCD_init();
 }
-
-
 
  void PIEZO_Config(void){
 	 __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -190,7 +182,7 @@ void UART_Config(void){
 
    //UART 세팅
    UartHandle.Instance = USART1;
-   UartHandle.Init.BaudRate = 9600;
+   UartHandle.Init.BaudRate = 115200;    // 윈도우 pc랑은 9600
    UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
    UartHandle.Init.StopBits = UART_STOPBITS_1;
    UartHandle.Init.Parity = UART_PARITY_NONE;
@@ -215,14 +207,6 @@ void TIMER2_Config(int period){
 	TimHandle2.Init.CounterMode = TIM_COUNTERMODE_UP;   // 0부터 ARR 설정값 까지 올라가면서 카운트
 	HAL_TIM_Base_Init(&TimHandle2);
 	HAL_TIM_Base_Start_IT(&TimHandle2);
-//	 TIM_OCInit.OCMode = TIM_OCMODE_TIMING;
-//	 TIM_OCInit.Pulse = 8400 -1;
-//	 TIM_OCInit.OCPolarity =TIM_OCPOLARITY_LOW;
-//	 TIM_OCInit.OCFastMode = TIM_OCFAST_DISABLE;
-//	 HAL_TIM_OC_Init(&TimHandle2);
-//
-//	 HAL_TIM_OC_ConfigChannel(&TimHandle2, &TIM_OCInit, TIM_CHANNEL_1);
-//	 HAL_TIM_OC_Start_IT(&TimHandle2, TIM_CHANNEL_1);
 
 	HAL_NVIC_SetPriority(TIM2_IRQn,0,0);
 	HAL_NVIC_EnableIRQ(TIM2_IRQn);
@@ -234,7 +218,7 @@ void TIMER2_Config(int period){
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 	 if(GPIO_Pin == GPIO_PIN_0){ // key up
-		 uint8_t arr[] = "camera on\n\r";
+		 uint8_t arr[] = "o";
 		 HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
 
 		 for(int i=0; i<6; i++){
@@ -243,7 +227,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 		 }
 	 }
 	 else if(GPIO_Pin == GPIO_PIN_1){  // key down
-		 uint8_t arr[] = "camera off\n\r";
+		 uint8_t arr[] = "f";
 		 HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
 
 		 for(int i=0; i<6; i++){
@@ -253,50 +237,59 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	 }
 
 	 else if(GPIO_Pin == GPIO_PIN_2){  // key center
-		   timer_cnt = 10000*click;
-		   TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
-		   click +=1;
-	 	 }
+		 timer_cnt = 10000*click;
+		 //TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
+		 click +=1;
+		 LCD_init();
+		 char* s1 = "set alarm: ";
+		 char s2[2];
+		 sprintf(s2, "%d", click);  // click 문자열로 변환
+		 lcd_put_string(s1);
+		 lcd_put_string(s2);
+	 }
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
      //RxBuffer[0] += 1;
      HAL_UART_Transmit(huart, (uint8_t*)RxBuffer, 1, 0xFFFF);
 
-     unsigned int period,buf;
 
-     for(int i=0; i<10; i++){
-         for(period = 0x1000; period >=1; period--){
-        	 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 1);
-        	 buf = period;
-        	 while(buf--);
+     if(RxBuffer[0] == 'chin'){  // 바르지 못한 자세일때
+         unsigned int period,buf;
 
-        	 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 0);
-        	 buf = period;
-        	 while(buf--);
+         for(int i=0; i<5; i++){
+             for(period = 0x1000; period >=1; period--){
+            	 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 1);
+            	 buf = period;
+            	 while(buf--);
+
+            	 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, 0);
+            	 buf = period;
+            	 while(buf--);
+             }
          }
      }
+
+     else if (RxBuffer[0] == 'nomal'){  // 사람이 앉았을때
+    	 TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
+     }
+
+     else if(RxBuffer[0] == 'nothing'){
+    		__HAL_RCC_TIM2_CLK_DISABLE();
+     }
+
 
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
-
-//	 for(int i=0; i<sizeof(star)/sizeof(int); i++){
-//		 play_note(star[i]);
+	play_note(0);
+//	 for(int i=0; i<sizeof(test)/sizeof(int); i++){
+//		 play_note(test[i]);
 //	 }
-
-	 for(int i=0; i<sizeof(test)/sizeof(int); i++){
-		 play_note(test[i]);
-	 }
 }
 
-//void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef* htim){
-//		 for(int i=0; i<sizeof(star)/sizeof(int); i++){
-//			 play_note(star[i]);
-//		 }
-//}
 
-//--------------------------------------Function----------------------------------------------------
+//-----------------------------------------Function----------------------------------------------------
 
 void lcd_put_string(char* str ){
 	char* s = str;
@@ -309,6 +302,17 @@ void lcd_put_string(char* str ){
 			LCD_init();
 		}
 	}
+}
+
+void LCD_init(){
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+	LCD_write(0,0x33);
+	LCD_write(0,0x32);
+	LCD_write(0,0x28);
+	LCD_write(0,0x0F);
+	LCD_write(0,0x01);
+	LCD_write(0,0x06);
+	LCD_write(0,0x02);
 }
 
 void LCD_write(unsigned char rs, char data){  //rs는 0과 1을 가지는 옵션플래그
@@ -382,6 +386,7 @@ int main(int argc, char* argv[])
    EXTILine_JOG_Config();
    PIEZO_Config();
    click = 1;
+   LCD_Config();
 
    HAL_UART_Transmit(&UartHandle, (uint8_t*)TxBuffer, TxBufferSize, 0xFFFF);
 
