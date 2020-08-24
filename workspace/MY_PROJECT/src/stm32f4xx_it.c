@@ -25,6 +25,14 @@ void EXTI2_IRQHandler(){
 	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_2);
 }
 
+void EXTI11_IRQHandler(){
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_11);
+}
+
+void EXTI12_IRQHandler(){
+	HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_12);
+}
+
 void USART1_IRQHandler(void){
 	HAL_UART_IRQHandler(&UartHandle);
 }

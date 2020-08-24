@@ -68,6 +68,8 @@
 #define TxBufferSize   (countof(TxBuffer) - 1)
 #define RxBufferSize   0xFF
 #define arrSize (countof(arr) - 1)
+#define testSize (countof(test) - 1)
+
 
 // ----- main() ---------------------------------------------------------------
 
@@ -94,7 +96,8 @@ uint8_t TxBuffer[] = "Hello World! \n\r" ;
 uint8_t RxBuffer[RxBufferSize];
 
 int star[]= {0,0,4,4,5,5,4,3,3,2,2,1,1,0};
-int timer_cnt=10000,click=1;
+int timer_cnt=10000;
+uint8_t click=1;
 int cnt=0;
 //int t_cnt=0;  // 타이머인터럽트 방생시 첫번째 인터럽트 소리만 다르게하려고
 
@@ -236,6 +239,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     if(GPIO_Pin == GPIO_PIN_0){ // key up
        uint8_t arr[] = "o";
        HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
        for(int i=0; i<6; i++){
           HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2 |GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 );
           ms_delay_int_count(100);
@@ -246,6 +251,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     else if(GPIO_Pin == GPIO_PIN_1){  // key down
        uint8_t arr[] = "f";
        HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
        for(int i=0; i<6; i++){
           HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_2 |GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5 );
           ms_delay_int_count(100);
@@ -254,15 +261,27 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     }
 
     else if(GPIO_Pin == GPIO_PIN_2){  // key center
-       timer_cnt = 100000*click;
        //TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
        click +=1;
+       timer_cnt = 100000*click;
+
        LCD_init();
        char* s1 = "set alarm: ";
        char s2[2];
        sprintf(s2, "%d", click);  // click 문자열로 변환
        lcd_put_string(s1);
        lcd_put_string(s2);
+
+
+       //uint8_t arr[] = "t";
+       //HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+
+       //char s2[2];
+       //sprintf(s2, "%d", click);
+       //uint8_t test[1];
+       //test[0]= click;
+       //HAL_UART_Transmit(&UartHandle, (uint8_t*)test, testSize,0xFFFF);
+
     }
 }
 
@@ -271,8 +290,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
 //     if(HAL_UART_Receive(&UartHandle, (uint8_t*) RxBuffer,1,0xFFFF) == HAL_OK)
 //     {
-//    		LCD_init();
-//    		LCD_write(1,RxBuffer[0]);
+//          LCD_init();
+//          LCD_write(1,RxBuffer[0]);
 
 
         if(RxBuffer[0] == 'h')
@@ -301,17 +320,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
 
         else if (RxBuffer[0] == 'p')
         {  // 사람이 앉았을때
-        	if(cnt == 0)
-        	{
-        		TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
-        	}
+           if(cnt == 0)
+           {
+              TIMER2_Config(timer_cnt);  // 10000이 들어가면 1초
+           }
 
         }
         else if(RxBuffer[0] == 'x')
         {
-        	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-        	__HAL_RCC_TIM2_CLK_DISABLE();
-        	cnt=0;
+           HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+           __HAL_RCC_TIM2_CLK_DISABLE();
+           cnt=0;
         }
 
      //}
@@ -321,18 +340,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim){
 
    if(cnt == 0)
    {
-	   play_note(0);
-	   cnt=1;
+      play_note(0);
+      cnt=1;
    }
    else
    {
-	   play_note(0);play_note(1);play_note(2);
+       uint8_t arr[] = "a";
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr, arrSize,0xFFFF);
+      play_note(0);play_note(1);play_note(2);
+       ms_delay_int_count(100);
+       uint8_t arr2[] = "n";
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr2, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr2, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr2, arrSize,0xFFFF);
+       HAL_UART_Transmit(&UartHandle, (uint8_t*)arr2, arrSize,0xFFFF);
    }
 
-
-//    for(int i=0; i<sizeof(test)/sizeof(int); i++){
-//       play_note(test[i]);
-//    }
 }
 
 //-----------------------------------------Function----------------------------------------------------
@@ -435,6 +461,18 @@ int main(int argc, char* argv[])
    LCD_Config();
    Vibration_Config();
    timer_cnt = 100000*click;
+
+
+   LCD_init();
+   char* s1 = "set alarm: ";
+   char s2[2];
+   sprintf(s2, "%d", click);  // click 문자열로 변환
+   lcd_put_string(s1);
+   lcd_put_string(s2);
+
+   if(cnt!=0)
+      TIMER2_Config(timer_cnt);
+
 
    //HAL_UART_Transmit(&UartHandle, (uint8_t*)TxBuffer, TxBufferSize, 0xFFFF);
 

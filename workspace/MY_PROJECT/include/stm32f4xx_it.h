@@ -3,6 +3,8 @@
 void EXTI0_IRQHandler(void);
 void EXTI1_IRQHandler(void);
 void EXTI2_IRQHandler(void);
+void EXTI11_IRQHandler(void);
+void EXTI12_IRQHandler(void);
 
 void TIM2_IRQHandler(void);
 //void TIM3_IRQHandler(void);
